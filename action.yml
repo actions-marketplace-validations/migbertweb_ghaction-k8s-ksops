@@ -1,0 +1,60 @@
+name: "📦 Setup K8s Tools (KSOPS, Age, SOPS)"
+description: "Instala age, sops, ksops y configura la clave SOPS/AGE"
+
+inputs:
+  ksops_version:
+    description: "Versión de KSOPS"
+    required: false
+    default: "4.3.3"
+  sops_version:
+    description: "Versión de SOPS"
+    required: false
+    default: "latest"
+  age_version:
+    description: "Versión de Age"
+    required: false
+    default: "1.2.1"
+
+secrets:
+  SOPS_AGE_KEY:
+    description: "Clave privada de SOPS con Age"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Instalar SOPS con arkade
+      uses: alexellis/arkade-get@master
+      with:
+        sops: ${{ inputs.sops_version }}
+
+    - name: Instalar KSOPS
+      run: |
+        mkdir -p ~/.config/kustomize/plugin/viaduct.ai/v1/ksops
+        curl -LO https://github.com/viaduct-ai/kustomize-sops/releases/download/v${{ inputs.ksops_version }}/ksops_${{ inputs.ksops_version }}_Linux_x86_64.tar.gz
+        tar -xzf ksops_${{ inputs.ksops_version }}_Linux_x86_64.tar.gz
+        rm ksops_${{ inputs.ksops_version }}_Linux_x86_64.tar.gz
+        mv ksops ~/.config/kustomize/plugin/viaduct.ai/v1/ksops/ksops
+      shell: bash
+
+    - name: Instalar Age
+      run: |
+        curl -L https://github.com/FiloSottile/age/releases/download/v${{ inputs.age_version }}/age-v${{ inputs.age_version }}-linux-amd64.tar.gz | tar xz
+        sudo mv age/age /usr/local/bin/
+        sudo mv age/age-keygen /usr/local/bin/
+      shell: bash
+
+    - name: Configurar clave privada Age
+      run: |
+        mkdir -p ~/.config/sops/age
+        echo "${{ secrets.SOPS_AGE_KEY }}" > ~/.config/sops/age/keys.txt
+      shell: bash
+
+    - name: Verificar herramientas instaladas
+      run: |
+        echo "✅ Verificación de herramientas instaladas:"
+        echo "kubectl:" && kubectl version --client || echo "kubectl no instalado"
+        echo "sops:" && sops --version
+        echo "age:" && age --version
+        echo "ksops:" && ~/.config/kustomize/plugin/viaduct.ai/v1/ksops/ksops version || echo "ksops no detectado"
+      shell: bash
